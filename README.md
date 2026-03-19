@@ -1,36 +1,35 @@
 DepotDownloader
 ===============
 
-Steam depot downloader utilizing the SteamKit2 library. Supports .NET 8.0
+Steam depot downloader utilizing the SteamKit2 library. Supports .NET 10.0.
+
+This mod is designed to **download depots without a login** by allowing you to supply the necessary access tokens, manifest files, and depot decryption keys manually. By bypassing Steam's standard account access checks, it can download any depot contents as long as you provide the required keys and files.
 
 This program must be run from a console, it has no GUI.
 
 ## Installation
 
-### Directly from GitHub
-
-Download a binary from [the releases page](https://github.com/SteamRE/DepotDownloader/releases/latest).
-
-### via Windows Package Manager CLI (aka winget)
-
-On Windows, [winget](https://github.com/microsoft/winget-cli) users can download and install
-the latest Terminal release by installing the `SteamRE.DepotDownloader`
-package:
-
-```powershell
-winget install --exact --id SteamRE.DepotDownloader
-```
-
-### via Homebrew
-
-On macOS, [Homebrew](https://brew.sh) users can download and install that latest release by running the following commands:
-
-```shell
-brew tap steamre/tools
-brew install depotdownloader
-```
+Download a binary from [the releases page](https://github.com/kaisma0/DepotDownloader/releases/latest).
 
 ## Usage
+
+### Downloading Depots Anonymously
+You do not need to provide a Steam account (`-username`/`-password`). Simply supply the tokens and keys.
+
+```powershell
+./DepotDownloader -app <id> -depot <id> -manifest <id> -depotkeys <file> -manifestfile <file> [-apptoken <#>] [-packagetoken <#>]
+```
+
+**Example:**
+```powershell
+./DepotDownloader -app 730 -depot 731 -manifest 7617088375292372759 -depotkeys steam.keys -manifestfile 730_7617088375292372759.manifest
+```
+
+#### Depot Keys Format
+The `-depotkeys` argument expects a text file with one key per line in the format `DepotID;HexKey`:
+```text
+731;0123456789ABCDEF0123456789ABCDEF
+```
 
 ### Downloading one or all depots for an app
 ```powershell
@@ -62,15 +61,23 @@ For example: `./DepotDownloader -app 730 -ugc 770604181014286929`
 ## Parameters
 
 #### Authentication
-
 Parameter               | Description
 ----------------------- | -----------
-`-username <user>`      | the username of the account to login to for restricted content.
-`-password <pass>`      | the password of the account to login to for restricted content.
+`-username <user>`      | the username of the account to login to.
+`-password <pass>`      | the password of the account to login to.
 `-remember-password`    | if set, remember the password for subsequent logins of this user. (Use `-username <username> -remember-password` as login credentials)
 `-qr`                   | display a login QR code to be scanned with the Steam mobile app
 `-no-mobile`            | prefer entering a 2FA code instead of prompting to accept in the Steam mobile app.
 `-loginid <#>`          | a unique 32-bit integer Steam LogonID in decimal, required if running multiple instances of DepotDownloader concurrently.
+
+#### Mod Features
+
+Parameter               | Description
+----------------------- | -----------
+`-depotkeys <file>`     | A list of depot keys to use ('depotID;hexKey' per line).
+`-manifestfile <file>`  | Use specified Manifest file from Steam.
+`-apptoken <#>`         | Use specified App Access Token.
+`-packagetoken <#>`     | Use specified Package Access Token.
 
 #### Downloading
 
@@ -122,9 +129,7 @@ Any connection to Steam will be closed if they share a LoginID. You can specify 
 If you pass the `-password` parameter with a password that contains special characters, you will need to escape the command appropriately for the shell you are using. You do not have to include the `-password` parameter on the command line as long as you include a `-username`. You will be prompted to enter your password interactively.
 
 ### I am getting error 401 or no manifest code returned for old manifest ids
-Try logging in with a Steam account, this may happen when using anonymous account.
-
-Steam allows developers to block downloading old manifests, in which case no manifest code is returned even when parameters appear correct.
+Because this mod operates anonymously and bypasses account checks, Steam may still deny the manifest code request if the manifest is old. You should use the `-manifestfile` parameter to provide the actual manifest locally.
 
 ### Why am I getting slow download speeds and frequent connection timeouts?
 When downloading old builds, cache server may not have the chunks readily available which makes downloading slower.

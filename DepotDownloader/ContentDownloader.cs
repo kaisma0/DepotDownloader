@@ -186,6 +186,7 @@ namespace DepotDownloader
 
 
             var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
+            if (depots == null) return 0;
             var branches = depots["branches"];
             var node = branches[branch];
 
@@ -203,6 +204,7 @@ namespace DepotDownloader
         static uint GetSteam3DepotProxyAppId(uint depotId, uint appId)
         {
             var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
+            if (depots == null) return INVALID_APP_ID;
             var depotChild = depots[depotId.ToString()];
 
             if (depotChild == KeyValue.Invalid)
@@ -467,6 +469,7 @@ namespace DepotDownloader
 
             await steam3?.RequestAppInfo(appId);
 
+            /*
             if (!await AccountHasAccess(appId, appId))
             {
                 if (steam3.steamUser.SteamID.AccountType != EAccountType.AnonUser && await steam3.RequestFreeAppLicense(appId))
@@ -482,6 +485,7 @@ namespace DepotDownloader
                     throw new ContentDownloaderException(string.Format("App {0} ({1}) is not available from this account.", appId, contentName));
                 }
             }
+            */
 
             var hasSpecificDepots = depotManifestIds.Count > 0;
             var depotIdsFound = new List<uint>();
@@ -571,7 +575,8 @@ namespace DepotDownloader
                 if (depotIdsFound.Count < depotIdsExpected.Count)
                 {
                     var remainingDepotIds = depotIdsExpected.Except(depotIdsFound);
-                    throw new ContentDownloaderException(string.Format("Depot {0} not listed for app {1}", string.Join(", ", remainingDepotIds), appId));
+                    //throw new ContentDownloaderException(string.Format("Depot {0} not listed for app {1}", string.Join(", ", remainingDepotIds), appId));
+                    // Mod: force download even if depot not listed
                 }
             }
 
@@ -606,12 +611,14 @@ namespace DepotDownloader
                 await steam3.RequestAppInfo(appId);
             }
 
+            /*
             if (!await AccountHasAccess(appId, depotId))
             {
                 Console.WriteLine("Depot {0} is not available from this account.", depotId);
 
                 return null;
             }
+            */
 
             if (manifestId == INVALID_MANIFEST_ID)
             {
@@ -630,8 +637,17 @@ namespace DepotDownloader
                 }
             }
 
-            await steam3.RequestDepotKey(depotId, appId);
-            if (!steam3.DepotKeys.TryGetValue(depotId, out var depotKey))
+            byte[] depotKey = null;
+            if (DepotKeyStore.ContainsKey(depotId))
+            {
+                depotKey = DepotKeyStore.Get(depotId);
+                steam3.DepotKeys.Add(depotId, depotKey);
+            }
+            else
+            {
+                await steam3.RequestDepotKey(depotId, appId);
+            }
+            if (!steam3.DepotKeys.TryGetValue(depotId, out depotKey))
             {
                 Console.WriteLine("No valid depot key for {0}, unable to download.", depotId);
                 return null;
@@ -772,6 +788,20 @@ namespace DepotDownloader
                 // We only have to show this warning if the old manifest ID was different
                 var badHashWarning = (lastManifestId != depot.ManifestId);
                 oldManifest = Util.LoadManifestFromFile(configDir, depot.DepotId, lastManifestId, badHashWarning);
+            }
+
+            if (Config.UseManifestFile)
+            {
+                lastManifestId = depot.ManifestId;
+                oldManifest = DepotManifest.LoadFromFile(Config.ManifestFile);
+                if (oldManifest.FilenamesEncrypted)
+                {
+                    if (!oldManifest.DecryptFilenames(depot.DepotKey))
+                    {
+                        Console.WriteLine("Failed to decrypt filenames in manifest file.");
+                        return null;
+                    }
+                }
             }
 
             if (lastManifestId == depot.ManifestId && oldManifest != null)
